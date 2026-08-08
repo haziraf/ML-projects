@@ -1,7 +1,15 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
+
+# Python and test-tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # Distribution / packaging
 build/
@@ -10,14 +18,23 @@ dist/
 .eggs/
 *.egg
 
-# Environments
+# Environments and local secrets
 .env
+.env.*
+!.env.example
+!.env.template
 .venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
@@ -49,3 +66,11 @@ logs/
 
 # System files
 .DS_Store
+
+# JavaScript dependencies and caches
+**/node_modules/
+**/.npm/
+
+# Generated forecasting outputs
+Retail_Demand_Forecast/artifacts/
+Daily_Demand_Forecasting_Orders/outputs/

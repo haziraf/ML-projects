@@ -1,6 +1,6 @@
 # Machine Learning Projects
 
-A collection of reproducible machine-learning projects focused on demand forecasting, chronological model evaluation, and decision-ready reporting. The repository currently includes two end-to-end forecasting pipelines and a starter data loader for credit-risk modeling.
+A collection of reproducible machine-learning projects focused on demand forecasting, binary classification, leakage-safe evaluation, and decision-ready reporting. The repository currently includes two forecasting pipelines and one credit-classification research benchmark, each with measured results and reproducible artifacts.
 
 ## Projects
 
@@ -8,7 +8,7 @@ A collection of reproducible machine-learning projects focused on demand forecas
 |---|---|---|---|
 | [Retail Demand Forecast](Retail_Demand_Forecast/) | Forecast daily carton demand across a Country → Region → Chain → Parent SKU hierarchy | Rolling-origin validation, gradient boosting, Fourier regression, forecast reconciliation, and empirical intervals | Complete pipeline and interactive dashboard |
 | [Daily Demand Forecasting Orders](Daily_Demand_Forecasting_Orders/) | Forecast the next five working-day order totals from a 60-row UCI dataset | Leakage-safe baselines, weekday means, Ridge regression, expanding-window backtesting, and empirical intervals | Complete compact case study |
-| [German Credit Data](German_Credit_Data/) | Load and cache the UCI Statlog German Credit dataset | Shared UCI data-loading utility | Data-ingestion starter; modeling is not yet implemented |
+| [German Credit Data](German_Credit_Data/) | Predict bad-credit outcomes in the UCI Statlog German Credit dataset | Reproducible EDA, fold-safe preprocessing, feature engineering, GridSearchCV, threshold selection, and subgroup diagnostics | Complete research benchmark; not approved for lending use |
 
 ## Highlights
 
@@ -37,6 +37,21 @@ The selected weekday-mean model achieved a held-out MAE of **64.65 order units**
 
 ![Daily order forecast](Daily_Demand_Forecasting_Orders/outputs/demand_forecast.png)
 
+### German credit classification
+
+This project turns the 1,000-row UCI Statlog German Credit dataset into an end-to-end binary-classification benchmark. It profiles the legacy coded data, keeps an 80/20 stratified holdout untouched during model selection, compares logistic regression, random forest, and histogram gradient boosting against a prevalence baseline, and saves a reload-tested raw-input inference pipeline.
+
+In the checked-in experiment:
+
+- Random Forest was selected using five-fold cross-validated average precision.
+- Holdout average precision was **0.670** (bootstrap 95% CI **0.551–0.781**) and ROC-AUC was **0.809** (95% CI **0.743–0.872**).
+- A training-only F2 threshold of **0.266** produced **93.3% recall** and **37.8% precision** for bad-credit cases, illustrating the explicit false-positive trade-off.
+- The dataset contains sensitive or proxy attributes, lacks timestamps, and is small and historical; the saved model is a research baseline, not an autonomous lending system.
+
+[Read the classification report](German_Credit_Data/Report.md) · [Read the exploratory data report](German_Credit_Data/EDA_Report.md)
+
+![German credit feature associations](German_Credit_Data/artifacts/eda/figures/target_association_strength.png)
+
 ## Repository structure
 
 ```text
@@ -47,7 +62,12 @@ ML-projects/
 │   ├── main.py                       # End-to-end forecasting pipeline
 │   └── Report.md                     # Detailed methodology and findings
 ├── German_Credit_Data/
-│   └── main.py                       # UCI dataset loader
+│   ├── artifacts/eda/figures/        # Checked-in EDA visualizations
+│   ├── eda.py                        # Reproducible exploratory analysis
+│   ├── feature_processing.py         # Shared training/inference features
+│   ├── main.py                       # End-to-end classification pipeline
+│   ├── EDA_Report.md                 # Data-quality and pattern analysis
+│   └── Report.md                     # Model evaluation and limitations
 ├── Retail_Demand_Forecast/
 │   ├── artifacts/                    # Selected reports, plots, and dashboard
 │   ├── data/                         # Retail time-series input
@@ -135,20 +155,37 @@ python main.py --help
 
 Generated files include `demand_forecast.csv`, `model_comparison.csv`, `backtest_predictions.csv`, and `demand_forecast.png`.
 
-### 3. Load the German credit dataset
+### 3. Run the German credit analysis
 
-The German credit folder currently exposes a loader rather than a training pipeline. From the repository root:
+Run the full classification experiment from the repository root:
 
-```python
-from pathlib import Path
-
-from German_Credit_Data.main import load_dataset
-
-credit = load_dataset(Path("German_Credit_Data/data/german_credit.csv"))
-print(credit.shape)
+```bash
+python German_Credit_Data/main.py
 ```
 
-The first call downloads UCI dataset 144 and caches it at the supplied path.
+The script downloads UCI dataset 144 when its local cache is absent. It then:
+
+- validates and profiles the 20 predictors and binary target;
+- creates two prediction-time-safe credit ratios;
+- fits imputation, scaling, one-hot encoding, and feature selection inside each fold;
+- tunes three model families with five-fold stratified cross-validation;
+- selects a recall-oriented decision threshold from training out-of-fold predictions;
+- evaluates once on the untouched holdout; and
+- writes a reload-tested `model.joblib`, metrics, diagnostics, plots, and `Report.md`.
+
+Use the reduced grid for a faster end-to-end smoke test:
+
+```bash
+python German_Credit_Data/main.py --quick
+```
+
+Once `German_Credit_Data/data/german_credit.csv` exists, regenerate the standalone EDA report and audit artifacts with:
+
+```bash
+python German_Credit_Data/eda.py
+```
+
+Review all supported arguments with `python German_Credit_Data/main.py --help`. The model output is for reproducible research only and has not been validated in a production lending environment.
 
 ### 4. Calculate forecast metrics from a CSV
 
@@ -164,14 +201,15 @@ It prints JSON containing observation count, MAE, RMSE, MAPE, sMAPE, WAPE, and s
 
 ## Modeling principles
 
-- Use chronological splits for forecasting; never shuffle future observations into training data.
+- Match validation to the inference setting: chronological splits for forecasting and stratified splits for the IID credit benchmark.
 - Fit preprocessing separately inside each validation fold.
 - Compare learned models with decision-relevant naive baselines.
 - Exclude fields that would not be known when a forecast is issued.
 - Preserve the retail hierarchy by forecasting at the bottom level and summing upward.
-- Report uncertainty and limitations alongside point estimates.
+- Select classification thresholds from training data rather than the final holdout.
+- Report uncertainty, subgroup evidence, and limitations alongside aggregate metrics.
 
-The checked-in results describe the supplied datasets and evaluation windows; they are not guarantees of future performance. The retail model does not currently receive future promotions, prices, holidays, stockouts, or campaign plans, while the daily-orders dataset lacks real calendar dates and contains only 60 rows.
+The checked-in results describe the supplied datasets and evaluation windows; they are not guarantees of future performance. The retail model does not currently receive future promotions, prices, holidays, stockouts, or campaign plans. The daily-orders dataset lacks real calendar dates and contains only 60 rows. The German Credit dataset is a small legacy snapshot without timestamps or a current applicant-population benchmark, so external validation, calibration, legal review, and a formal fairness assessment are required before any operational consideration.
 
 ## License
 

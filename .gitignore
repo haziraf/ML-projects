@@ -80,5 +80,10 @@ Retail_Demand_Forecast/deployment.md
 Daily_Demand_Forecasting_Orders/outputs/
 
 German_Credit_Data/__pycache__
-German_Credit_Data/artifacts
+German_Credit_Data/artifacts/eda/results
+
+German_Credit_Data/artifacts/ml_results
+German_Credit_Data/artifacts/figures
+
+
 

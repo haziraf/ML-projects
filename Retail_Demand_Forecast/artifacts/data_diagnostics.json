@@ -28,15 +28,15 @@
   },
   "weekday_max_min_ratio": 1.6809957302037835,
   "panel_lag_correlations": {
-    "1": 0.7829445984193724,
-    "7": 0.7703266864333785,
-    "14": 0.7671258541034425,
-    "28": 0.7719320728748517,
-    "364": 0.775591277088226,
-    "365": 0.7176933256773765
+    "1": 0.7829445984193738,
+    "7": 0.7703266864333793,
+    "14": 0.7671258541034404,
+    "28": 0.7719320728748523,
+    "364": 0.7755912770882273,
+    "365": 0.7176933256773773
   },
-  "weekly_stl_seasonal_strength_total": 0.39630067248399226,
-  "weekly_stl_trend_strength_total": 0.2766885887585605,
-  "weekly_stl_seasonal_strength_bottom_median": 0.26664073814151457,
-  "weekly_stl_trend_strength_bottom_median": 0.24204166772905955
+  "weekly_stl_seasonal_strength_total": 0.39630067248404377,
+  "weekly_stl_trend_strength_total": 0.2766885887586168,
+  "weekly_stl_seasonal_strength_bottom_median": 0.26664073814151723,
+  "weekly_stl_trend_strength_bottom_median": 0.24204166772906122
 }

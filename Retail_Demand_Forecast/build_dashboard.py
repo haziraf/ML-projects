@@ -31,11 +31,6 @@ def parse_args() -> argparse.Namespace:
         default=project_dir / "artifacts" / "future_hierarchical_forecast.csv",
     )
     parser.add_argument(
-        "--interval-calibration",
-        type=Path,
-        default=project_dir / "artifacts" / "interval_calibration.csv",
-    )
-    parser.add_argument(
         "--output",
         type=Path,
         default=project_dir / "artifacts" / "retail_demand_dashboard.html",
@@ -60,7 +55,7 @@ def fitted_ensemble(
     dates: pd.DatetimeIndex,
     meta: pd.DataFrame,
     horizon: int,
-) -> tuple[np.ndarray, forecast_pipeline.DirectHybridForecaster]:
+) -> np.ndarray:
     hybrid = forecast_pipeline.DirectHybridForecaster(horizon).fit(values, dates, meta)
     frames = []
     for target_index in range(ESTIMATE_START_INDEX, len(values)):
@@ -92,44 +87,34 @@ def fitted_ensemble(
     estimate[ESTIMATE_START_INDEX:] = 0.5 * (
         hybrid_values + harmonic_values[ESTIMATE_START_INDEX:]
     )
-    return estimate, hybrid
+    return estimate
 
 
-def future_ensemble(
-    values: np.ndarray,
-    dates: pd.DatetimeIndex,
-    meta: pd.DataFrame,
-    hybrid: forecast_pipeline.DirectHybridForecaster,
-    calibration_path: Path,
-    horizon: int,
-) -> tuple[pd.DatetimeIndex, np.ndarray, np.ndarray, np.ndarray]:
-    future_dates = pd.date_range(dates[-1] + pd.Timedelta(days=1), periods=horizon, freq="D")
-    hybrid_forecast = hybrid.forecast(values, dates, future_dates, meta)
-    harmonic_forecast = forecast_pipeline.fourier_trend_forecast(values, horizon)
-    point = np.maximum(0.0, 0.5 * (hybrid_forecast + harmonic_forecast))
-    calibration = pd.read_csv(calibration_path)["scaled_abs_error_q80"].to_numpy(float)
-    if len(calibration) != horizon:
-        raise ValueError("Interval calibration does not match the dashboard horizon")
-    radius = calibration[:, None] * np.sqrt(point + 1.0)
-    return future_dates, point, np.maximum(0.0, point - radius), point + radius
-
-
-def verify_forecast_artifact(
+def load_forecast_artifact(
     artifact_path: Path,
-    future_dates: pd.DatetimeIndex,
     meta: pd.DataFrame,
-    point: np.ndarray,
-) -> None:
+) -> tuple[pd.DatetimeIndex, np.ndarray, np.ndarray, np.ndarray]:
     artifact = pd.read_csv(artifact_path, parse_dates=["Date"])
     artifact = artifact.loc[artifact["level"] == "Bottom"].copy()
+    if artifact.empty:
+        raise ValueError("Forecast artifact contains no bottom-series rows")
+    if set(artifact["model"].unique()) != {MODEL_NAME}:
+        raise ValueError("Forecast artifact model does not match the dashboard model")
     expected_nodes = meta.astype(str).agg(" / ".join, axis=1).tolist()
-    pivot = artifact.pivot(index="Date", columns="node_id", values="forecast")
-    pivot = pivot.reindex(index=future_dates, columns=expected_nodes)
-    if pivot.isna().any().any():
-        raise ValueError("Forecast artifact is missing dashboard bottom-series rows")
-    max_difference = float(np.max(np.abs(pivot.to_numpy() - point)))
-    if max_difference > 1e-6:
-        raise ValueError(f"Rebuilt forecasts differ from the validated artifact by {max_difference}")
+    future_dates = pd.DatetimeIndex(sorted(artifact["Date"].unique()))
+    matrices = []
+    for value_column in ("forecast", "lower_80", "upper_80"):
+        pivot = artifact.pivot(index="Date", columns="node_id", values=value_column)
+        pivot = pivot.reindex(index=future_dates, columns=expected_nodes)
+        if pivot.isna().any().any():
+            raise ValueError(
+                f"Forecast artifact is missing dashboard values for {value_column}"
+            )
+        matrices.append(pivot.to_numpy(float))
+    point, lower, upper = matrices
+    if (point < 0).any() or (lower < 0).any() or (lower > point).any() or (point > upper).any():
+        raise ValueError("Forecast artifact contains invalid point or interval values")
+    return future_dates, point, lower, upper
 
 
 def dashboard_payload(
@@ -183,11 +168,10 @@ def main() -> None:
     _, wide, meta = forecast_pipeline.load_and_validate(args.data, horizon=28)
     values = wide.to_numpy(float)
     dates = pd.DatetimeIndex(wide.index)
-    estimate, hybrid = fitted_ensemble(values, dates, meta, horizon=28)
-    future_dates, point, lower, upper = future_ensemble(
-        values, dates, meta, hybrid, args.interval_calibration, horizon=28
+    estimate = fitted_ensemble(values, dates, meta, horizon=28)
+    future_dates, point, lower, upper = load_forecast_artifact(
+        args.forecast_artifact, meta
     )
-    verify_forecast_artifact(args.forecast_artifact, future_dates, meta, point)
     series, metadata = dashboard_payload(
         values, estimate, point, lower, upper, dates, future_dates, meta
     )

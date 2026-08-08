@@ -88,7 +88,7 @@
 
     .filter-panel {
       display: grid;
-      grid-template-columns: repeat(5, minmax(145px, 1fr)) auto;
+      grid-template-columns: repeat(6, minmax(135px, 1fr)) auto;
       align-items: end;
       gap: 13px;
     }
@@ -188,6 +188,9 @@
     }
 
     .phase-swatch { width: 13px; height: 13px; border-radius: 3px; background: rgba(249,115,22,.10); border: 1px solid rgba(249,115,22,.35); }
+    .chart-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .btn-small { min-height: 32px; padding: 5px 10px; font-size: 12px; }
+    [hidden] { display: none !important; }
 
     .note {
       margin-top: 12px;
@@ -211,6 +214,7 @@
     .phase-pill { display: inline-block; padding: 3px 7px; border-radius: 999px; font-weight: 700; }
     .phase-history { color: #1d4ed8; background: #dbeafe; }
     .phase-forecast { color: #c2410c; background: #ffedd5; }
+    .phase-mixed { color: #6d28d9; background: #ede9fe; }
 
     footer {
       display: flex;
@@ -253,7 +257,7 @@
       <div>
         <p class="eyebrow">Hierarchical demand planning</p>
         <h1>Retail demand: actual, fitted estimate & forecast</h1>
-        <p class="subtitle">Explore daily carton demand across the Country × Region × Chain × Parent SKU hierarchy. Historical fitted values and future forecasts use the selected Hybrid Fourier Ensemble.</p>
+        <p class="subtitle">Explore monthly carton demand and drill down to daily detail across the Country × Region × Chain × Parent SKU hierarchy. Historical fitted values and future forecasts use the selected Hybrid Fourier Ensemble.</p>
       </div>
       <div class="model-badge">Selected model<strong id="model-name"></strong><span id="forecast-range"></span></div>
     </header>
@@ -264,6 +268,13 @@
         <div class="filter-group"><label for="region-filter">Region</label><select id="region-filter"></select></div>
         <div class="filter-group"><label for="chain-filter">Chain</label><select id="chain-filter"></select></div>
         <div class="filter-group"><label for="sku-filter">Parent SKU</label><select id="sku-filter"></select></div>
+        <div class="filter-group">
+          <label for="granularity-filter">Time granularity</label>
+          <select id="granularity-filter">
+            <option value="monthly" selected>Monthly</option>
+            <option value="daily">Daily</option>
+          </select>
+        </div>
         <div class="filter-group">
           <label for="window-filter">History window</label>
           <select id="window-filter">
@@ -290,20 +301,23 @@
 
     <section class="panel">
       <div class="panel-head">
-        <div><h2>Daily demand time series</h2><p>Cartons aggregated across the current hierarchy selection. Hover for daily values.</p></div>
-        <div class="phase-key"><span class="phase-swatch"></span>Shaded area = out-of-sample forecast</div>
+        <div><h2 id="chart-title">Monthly demand time series</h2><p id="chart-subtitle">Monthly cartons across the current hierarchy selection. Click a plotted month to drill down to daily values.</p></div>
+        <div class="chart-controls">
+          <div class="phase-key"><span class="phase-swatch"></span>Shaded area = out-of-sample forecast</div>
+          <button type="button" class="btn btn-secondary btn-small" id="back-monthly-button" hidden>← Back to monthly</button>
+        </div>
       </div>
       <div class="chart-wrap"><canvas id="demand-chart" aria-label="Actual, fitted estimate, and forecast time series"></canvas></div>
-      <div class="note">In-sample estimates are fitted diagnostic values from a model trained on the complete history. Use the separately reported rolling-validation and untouched-holdout results for an unbiased accuracy assessment. Forecast bounds are approximate 80% empirical intervals and become conservative when multiple bottom series are aggregated.</div>
+      <div class="note">In-sample estimates are fitted diagnostic values from a model trained on the complete history. Use the separately reported rolling-validation and untouched-holdout results for an unbiased accuracy assessment. In monthly view, observed month-to-date demand and the forecast remainder stay as separate series; edge months can be partial when a shorter history window is selected. Forecast bounds are approximate 80% empirical intervals and become conservative when multiple bottom series are aggregated.</div>
     </section>
 
     <section class="panel">
       <div class="panel-head">
-        <div><h2>Daily detail</h2><p>Most recent displayed dates first. Click a column heading to sort.</p></div>
+        <div><h2 id="detail-title">Monthly detail</h2><p id="detail-subtitle">Most recent displayed months first. Click a column heading to sort.</p></div>
         <div class="table-actions"><span id="table-count" class="kpi-detail"></span></div>
       </div>
       <div class="table-wrap"><table><thead><tr>
-        <th data-key="date">Date</th><th data-key="phase">Phase</th><th data-key="actual">Actual</th><th data-key="estimate">Fitted estimate</th><th data-key="error">Absolute error</th><th data-key="forecast">Forecast</th><th data-key="lower">Lower 80%</th><th data-key="upper">Upper 80%</th>
+        <th data-key="date" id="period-heading">Month</th><th data-key="phase">Phase</th><th data-key="actual">Actual</th><th data-key="estimate">Fitted estimate</th><th data-key="error">Absolute error</th><th data-key="forecast">Forecast</th><th data-key="lower">Lower 80%</th><th data-key="upper">Upper 80%</th>
       </tr></thead><tbody id="detail-body"></tbody></table></div>
     </section>
 
@@ -322,15 +336,22 @@
       chain: document.getElementById("chain-filter"),
       sku: document.getElementById("sku-filter")
     };
-    const state = { country: "all", region: "all", chain: "all", sku: "all", window: "365", sortKey: "date", sortDir: "desc" };
+    const state = { country: "all", region: "all", chain: "all", sku: "all", window: "365", granularity: "monthly", drillMonth: null, sortKey: "date", sortDir: "desc" };
     const fieldMap = { country: "country", region: "region", chain: "chain", sku: "sku" };
     const allLabels = { country: "All countries", region: "All regions", chain: "All chains", sku: "All Parent SKUs" };
     let currentRows = [];
+    let currentChartKeys = [];
 
     const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
     const fmt1 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const formatNumber = value => value === null || !Number.isFinite(value) ? "—" : fmt.format(value);
     const sum = values => values.reduce((acc, value) => acc + (Number.isFinite(value) ? value : 0), 0);
+    const monthKey = date => date.slice(0, 7);
+    const formatMonth = key => {
+      const [year, month] = key.split("-").map(Number);
+      return `${monthNames[month - 1]} ${year}`;
+    };
 
     function setOptions(select, values, allLabel, selected) {
       select.replaceChildren();
@@ -404,7 +425,7 @@
     const forecastShade = {
       id: "forecastShade",
       beforeDraw(chart, args, options) {
-        const index = chart.data.labels.indexOf(options.startDate);
+        const index = options.startIndex;
         if (index < 0) return;
         const { ctx, chartArea, scales } = chart;
         const x = scales.x.getPixelForValue(index);
@@ -436,8 +457,9 @@
         maintainAspectRatio: false,
         animation: { duration: 180 },
         interaction: { mode: "index", intersect: false },
+        onClick: (event, elements) => drillToDaily(elements),
         plugins: {
-          forecastShade: { startDate: META.futureDates[0] },
+          forecastShade: { startIndex: -1 },
           legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8, filter: item => item.text !== "80% lower" } },
           tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatNumber(context.parsed.y)} cartons` } }
         },
@@ -449,20 +471,99 @@
     });
 
     function displayStartIndex() {
+      if (state.granularity === "daily" && state.drillMonth) {
+        const monthStart = META.historyDates.findIndex(date => monthKey(date) === state.drillMonth);
+        if (monthStart >= 0) return monthStart;
+      }
       if (state.window === "all") return 0;
       return Math.max(0, META.historyDates.length - Number(state.window));
     }
 
-    function buildRows(data, start) {
-      const rows = [];
+    function emptyPeriod(key, label) {
+      return { key, label, actual: null, estimate: null, forecast: null, lower: null, upper: null, actualDays: 0, estimateDays: 0, forecastDays: 0 };
+    }
+
+    function buildDailyPeriods(data, start, drillMonth = null) {
+      const periods = new Map();
       for (let i = start; i < META.historyDates.length; i += 1) {
-        const estimate = data.estimate[i];
-        rows.push({ date: META.historyDates[i], phase: "In sample", actual: data.actual[i], estimate, error: estimate === null ? null : Math.abs(data.actual[i] - estimate), forecast: null, lower: null, upper: null });
+        const key = META.historyDates[i];
+        if (drillMonth && monthKey(key) !== drillMonth) continue;
+        const period = periods.get(key) || emptyPeriod(key, key);
+        period.actual = data.actual[i];
+        period.actualDays = 1;
+        period.estimate = data.estimate[i];
+        period.estimateDays = data.estimate[i] === null ? 0 : 1;
+        periods.set(key, period);
       }
       for (let i = 0; i < META.futureDates.length; i += 1) {
-        rows.push({ date: META.futureDates[i], phase: "Forecast", actual: null, estimate: null, error: null, forecast: data.forecast[i], lower: data.lower[i], upper: data.upper[i] });
+        const key = META.futureDates[i];
+        if (drillMonth && monthKey(key) !== drillMonth) continue;
+        const period = periods.get(key) || emptyPeriod(key, key);
+        period.forecast = data.forecast[i];
+        period.lower = data.lower[i];
+        period.upper = data.upper[i];
+        period.forecastDays = 1;
+        periods.set(key, period);
       }
-      return rows;
+      return [...periods.values()].sort((a, b) => a.key.localeCompare(b.key));
+    }
+
+    function buildMonthlyPeriods(data, start) {
+      const periods = new Map();
+      for (let i = start; i < META.historyDates.length; i += 1) {
+        const key = monthKey(META.historyDates[i]);
+        const period = periods.get(key) || emptyPeriod(key, formatMonth(key));
+        period.actual = (period.actual ?? 0) + data.actual[i];
+        period.actualDays += 1;
+        if (data.estimate[i] !== null) {
+          period.estimate = (period.estimate ?? 0) + data.estimate[i];
+          period.estimateDays += 1;
+        }
+        periods.set(key, period);
+      }
+      for (let i = 0; i < META.futureDates.length; i += 1) {
+        const key = monthKey(META.futureDates[i]);
+        const period = periods.get(key) || emptyPeriod(key, formatMonth(key));
+        period.forecast = (period.forecast ?? 0) + data.forecast[i];
+        period.lower = (period.lower ?? 0) + data.lower[i];
+        period.upper = (period.upper ?? 0) + data.upper[i];
+        period.forecastDays += 1;
+        periods.set(key, period);
+      }
+      const result = [...periods.values()].sort((a, b) => a.key.localeCompare(b.key));
+      result.forEach(period => {
+        if (period.estimateDays !== period.actualDays) period.estimate = null;
+      });
+      return result;
+    }
+
+    function periodsToRows(periods) {
+      return periods.map(period => {
+        const phase = period.actual !== null && period.forecast !== null
+          ? "Actual + forecast"
+          : period.forecast !== null ? "Forecast" : "In sample";
+        return {
+          date: period.label,
+          sortDate: period.key,
+          phase,
+          actual: period.actual,
+          estimate: period.estimate,
+          error: period.actual !== null && period.estimate !== null ? Math.abs(period.actual - period.estimate) : null,
+          forecast: period.forecast,
+          lower: period.lower,
+          upper: period.upper
+        };
+      });
+    }
+
+    function drillToDaily(elements) {
+      if (state.granularity !== "monthly" || !elements.length) return;
+      const key = currentChartKeys[elements[0].index];
+      if (!key) return;
+      state.granularity = "daily";
+      state.drillMonth = key;
+      document.getElementById("granularity-filter").value = "daily";
+      updateDashboard();
     }
 
     function renderKPIs(data, selection) {
@@ -489,16 +590,40 @@
     }
 
     function renderChart(data, start) {
-      const historyDates = META.historyDates.slice(start);
-      const historyNulls = Array(historyDates.length).fill(null);
-      const futureNulls = Array(META.futureDates.length).fill(null);
-      demandChart.data.labels = historyDates.concat(META.futureDates);
-      demandChart.data.datasets[0].data = historyNulls.concat(data.lower);
-      demandChart.data.datasets[1].data = historyNulls.concat(data.upper);
-      demandChart.data.datasets[2].data = data.actual.slice(start).concat(futureNulls);
-      demandChart.data.datasets[3].data = data.estimate.slice(start).concat(futureNulls);
-      demandChart.data.datasets[4].data = historyNulls.concat(data.forecast);
+      const periods = state.granularity === "monthly"
+        ? buildMonthlyPeriods(data, start)
+        : buildDailyPeriods(data, start, state.drillMonth);
+      currentChartKeys = periods.map(period => period.key);
+      demandChart.data.labels = periods.map(period => period.label);
+      demandChart.data.datasets[0].data = periods.map(period => period.lower);
+      demandChart.data.datasets[1].data = periods.map(period => period.upper);
+      demandChart.data.datasets[2].data = periods.map(period => period.actual);
+      demandChart.data.datasets[3].data = periods.map(period => period.estimate);
+      demandChart.data.datasets[4].data = periods.map(period => period.forecast);
+      const pointRadius = state.granularity === "monthly" ? 3 : 0;
+      demandChart.data.datasets[2].pointRadius = pointRadius;
+      demandChart.data.datasets[3].pointRadius = pointRadius;
+      demandChart.data.datasets[4].pointRadius = state.granularity === "monthly" ? 4 : 1.5;
+      demandChart.options.plugins.forecastShade.startIndex = periods.findIndex(period => period.forecast !== null);
+      demandChart.options.scales.x.ticks.maxTicksLimit = state.granularity === "monthly" ? 18 : 14;
+
+      const isDrill = state.granularity === "daily" && state.drillMonth !== null;
+      document.getElementById("chart-title").textContent = state.granularity === "monthly"
+        ? "Monthly demand time series"
+        : isDrill ? `Daily demand — ${formatMonth(state.drillMonth)}` : "Daily demand time series";
+      document.getElementById("chart-subtitle").textContent = state.granularity === "monthly"
+        ? "Monthly cartons across the current hierarchy selection. Click a plotted month to drill down to daily values."
+        : isDrill
+          ? `Daily drill-down for ${formatMonth(state.drillMonth)}. Use Back to monthly to return.`
+          : "Daily cartons across the selected history window and future forecast.";
+      document.getElementById("back-monthly-button").hidden = !isDrill;
+      document.getElementById("detail-title").textContent = state.granularity === "monthly" ? "Monthly detail" : "Daily detail";
+      document.getElementById("detail-subtitle").textContent = state.granularity === "monthly"
+        ? "Most recent displayed months first. Click a column heading to sort."
+        : "Most recent displayed dates first. Click a column heading to sort.";
+      document.getElementById("period-heading").dataset.label = state.granularity === "monthly" ? "Month" : "Date";
       demandChart.update("none");
+      return periods;
     }
 
     function cell(text, className = "") {
@@ -512,7 +637,8 @@
       const body = document.getElementById("detail-body");
       body.replaceChildren();
       const sorted = [...currentRows].sort((a, b) => {
-        const av = a[state.sortKey], bv = b[state.sortKey];
+        const av = state.sortKey === "date" ? a.sortDate : a[state.sortKey];
+        const bv = state.sortKey === "date" ? b.sortDate : b[state.sortKey];
         if (av === null && bv === null) return 0;
         if (av === null) return 1;
         if (bv === null) return -1;
@@ -524,14 +650,15 @@
         tr.appendChild(cell(row.date));
         const phase = document.createElement("td");
         const pill = document.createElement("span");
-        pill.className = `phase-pill ${row.phase === "Forecast" ? "phase-forecast" : "phase-history"}`;
+        const phaseClass = row.phase === "Forecast" ? "phase-forecast" : row.phase === "Actual + forecast" ? "phase-mixed" : "phase-history";
+        pill.className = `phase-pill ${phaseClass}`;
         pill.textContent = row.phase;
         phase.appendChild(pill);
         tr.appendChild(phase);
         ["actual", "estimate", "error", "forecast", "lower", "upper"].forEach(key => tr.appendChild(cell(formatNumber(row[key]))));
         body.appendChild(tr);
       });
-      document.getElementById("table-count").textContent = `${sorted.length} daily rows`;
+      document.getElementById("table-count").textContent = `${sorted.length} ${state.granularity === "monthly" ? "monthly" : "daily"} rows`;
       document.querySelectorAll("th[data-key]").forEach(th => {
         const base = th.dataset.label || th.textContent.replace(/ [▲▼]$/, "");
         th.dataset.label = base;
@@ -541,7 +668,8 @@
 
     function updateSelectionText(selection) {
       const labels = [state.country, state.region, state.chain, state.sku].map((value, i) => value === "all" ? ["All countries", "All regions", "All chains", "All SKUs"][i] : value);
-      document.getElementById("selection-path").textContent = labels.join("  ›  ");
+      const timeLabel = state.granularity === "monthly" ? "Monthly" : state.drillMonth ? `Daily: ${formatMonth(state.drillMonth)}` : "Daily";
+      document.getElementById("selection-path").textContent = `${labels.join("  ›  ")}  ·  ${timeLabel}`;
       document.getElementById("series-count").textContent = selection.length;
     }
 
@@ -549,10 +677,9 @@
       const selection = selectedSeries();
       const data = aggregateSelection(selection);
       const start = displayStartIndex();
-      currentRows = buildRows(data, start);
       updateSelectionText(selection);
       renderKPIs(data, selection);
-      renderChart(data, start);
+      currentRows = periodsToRows(renderChart(data, start));
       renderTable();
     }
 
@@ -585,9 +712,21 @@
       });
     });
     document.getElementById("window-filter").addEventListener("change", event => { state.window = event.target.value; updateDashboard(); });
+    document.getElementById("granularity-filter").addEventListener("change", event => {
+      state.granularity = event.target.value === "daily" ? "daily" : "monthly";
+      state.drillMonth = null;
+      updateDashboard();
+    });
+    document.getElementById("back-monthly-button").addEventListener("click", () => {
+      state.granularity = "monthly";
+      state.drillMonth = null;
+      document.getElementById("granularity-filter").value = "monthly";
+      updateDashboard();
+    });
     document.getElementById("reset-button").addEventListener("click", () => {
-      Object.assign(state, { country: "all", region: "all", chain: "all", sku: "all", window: "365" });
+      Object.assign(state, { country: "all", region: "all", chain: "all", sku: "all", window: "365", granularity: "monthly", drillMonth: null });
       document.getElementById("window-filter").value = "365";
+      document.getElementById("granularity-filter").value = "monthly";
       refreshCascades();
       updateDashboard();
     });

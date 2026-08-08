@@ -73,4 +73,6 @@ logs/
 
 # Generated forecasting outputs
 Retail_Demand_Forecast/artifacts/
+Retail_Demand_Forecast/__pycache__
 Daily_Demand_Forecasting_Orders/outputs/
+

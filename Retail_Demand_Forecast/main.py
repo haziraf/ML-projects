@@ -805,11 +805,56 @@ def write_report(
             "forecast in the inventory decision process rather than treating statistical error "
             "alone as business value.",
             "",
+            "## Interactive dashboard",
+            "",
+            "[Open the Retail Demand Forecast Dashboard](retail_demand_dashboard.html)",
+            "",
+            "The dashboard provides cascading Country, Region, Chain, and Parent SKU filters. "
+            "It opens with a monthly time-series view and supports click-through drill-down to "
+            "daily historical actuals, in-sample fitted estimates, and the 28-day out-of-sample "
+            "forecast with approximate 80% intervals.",
+            "",
             "## Reproducibility",
             "",
-            "Run `python main.py`. The script records package versions, diagnostics, every fold, "
-            "holdout metrics, feature importance when applicable, plots, and coherent future "
-            "forecasts in `artifacts/`.",
+            "From the project directory, reproduce the analysis with the default settings:",
+            "",
+            "```bash",
+            "cd /Users/sitinoorhazirah/ML-projects/Retail_Demand_Forecast",
+            "python main.py",
+            "```",
+            "",
+            "To provide every forecasting argument explicitly:",
+            "",
+            "```bash",
+            f"python main.py --data data/retail_timeseries_2yr.csv --output-dir artifacts --horizon {horizon} --validation-folds {validation_folds}",
+            "```",
+            "",
+            "| Argument | Purpose | Default |",
+            "|---|---|---|",
+            "| `--data` | Input retail time-series CSV | `data/retail_timeseries_2yr.csv` |",
+            "| `--output-dir` | Forecast, metric, plot, and report directory | `artifacts` |",
+            f"| `--horizon` | Number of future daily periods | `{horizon}` |",
+            f"| `--validation-folds` | Number of expanding-window validation folds | `{validation_folds}` |",
+            "",
+            "The script can also be run from another directory by using its absolute path:",
+            "",
+            "```bash",
+            f"python /Users/sitinoorhazirah/ML-projects/Retail_Demand_Forecast/main.py --horizon {horizon} --validation-folds {validation_folds}",
+            "```",
+            "",
+            "Display the command-line help with `python main.py --help`.",
+            "",
+            "After the forecast artifacts exist, rebuild the interactive dashboard with:",
+            "",
+            "```bash",
+            "npm install",
+            "python build_dashboard.py",
+            "```",
+            "",
+            "Keep `--horizon 28` when rebuilding the current dashboard because its forecast and "
+            "interval configuration is designed for 28 days. The forecasting script records "
+            "package versions, diagnostics, every validation fold, holdout metrics, feature "
+            "importance, plots, and coherent future forecasts in `artifacts/`.",
         ]
     )
     if feature_importance is not None and not feature_importance.empty:

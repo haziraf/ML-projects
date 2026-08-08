@@ -1,0 +1,11 @@
+{
+  "output": "/Users/sitinoorhazirah/ML-projects/Retail_Demand_Forecast/artifacts/retail_demand_dashboard.html",
+  "bytes": 1117849,
+  "history_dates": 730,
+  "future_dates": 28,
+  "bottom_series": 115,
+  "estimate_start": "2024-10-31",
+  "model": "HybridFourierEnsemble",
+  "embedded_chart_js": true,
+  "network_requests": false
+}

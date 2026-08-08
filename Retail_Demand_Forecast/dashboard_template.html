@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Retail Demand Forecast Dashboard</title>
+  <style>
+    :root {
+      --navy: #10233f;
+      --navy-2: #19375f;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --orange: #f97316;
+      --ink: #172033;
+      --muted: #657084;
+      --border: #dfe5ee;
+      --surface: #ffffff;
+      --canvas: #f3f6fa;
+      --positive: #15803d;
+      --negative: #b91c1c;
+      --shadow: 0 8px 28px rgba(16, 35, 63, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    button, select { font: inherit; }
+
+    .dashboard {
+      width: min(1540px, calc(100% - 32px));
+      margin: 16px auto 36px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 25px 28px;
+      color: #fff;
+      background: linear-gradient(125deg, var(--navy), var(--navy-2));
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      margin: 0 0 5px;
+      color: #9ec5ff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    h1 { margin: 0; font-size: clamp(24px, 3vw, 35px); line-height: 1.15; }
+    .subtitle { margin: 9px 0 0; color: #dbe7f7; max-width: 780px; }
+
+    .model-badge {
+      flex: 0 0 auto;
+      padding: 10px 13px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 10px;
+      background: rgba(255,255,255,.08);
+      color: #eaf2ff;
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .model-badge strong { display: block; margin-top: 2px; color: #fff; font-size: 14px; }
+
+    .panel {
+      margin-top: 16px;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .filter-panel {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(145px, 1fr)) auto;
+      align-items: end;
+      gap: 13px;
+    }
+
+    .filter-group label {
+      display: block;
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    select, .btn {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #cfd7e4;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    select { padding: 8px 34px 8px 10px; }
+    select:focus, .btn:focus { outline: 3px solid rgba(37,99,235,.18); border-color: var(--blue); }
+
+    .btn {
+      width: auto;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .btn-primary { color: #fff; background: var(--blue); border-color: var(--blue); }
+    .btn-secondary { color: var(--navy); background: #edf3fb; border-color: #d6e2f2; }
+    .button-stack { display: flex; gap: 8px; }
+
+    .selection-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 13px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .selection-line strong { color: var(--ink); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .kpi {
+      padding: 18px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      box-shadow: 0 5px 18px rgba(16,35,63,.055);
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .kpi-value { margin-top: 6px; font-size: clamp(23px, 2.6vw, 32px); font-weight: 780; }
+    .kpi-detail { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .positive { color: var(--positive); }
+    .negative { color: var(--negative); }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 12px;
+    }
+
+    .panel-head h2 { margin: 0; font-size: 18px; }
+    .panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .chart-wrap { position: relative; height: 480px; }
+
+    .phase-key {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .phase-swatch { width: 13px; height: 13px; border-radius: 3px; background: rgba(249,115,22,.10); border: 1px solid rgba(249,115,22,.35); }
+
+    .note {
+      margin-top: 12px;
+      padding: 11px 13px;
+      color: #42506a;
+      background: #f7faff;
+      border-left: 4px solid #8ab4f8;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .table-actions { display: flex; gap: 8px; align-items: center; }
+    .table-wrap { overflow: auto; max-height: 520px; border: 1px solid var(--border); border-radius: 9px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+    thead { position: sticky; top: 0; z-index: 2; background: #edf3fa; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #e8edf4; text-align: right; white-space: nowrap; }
+    th:first-child, th:nth-child(2), td:first-child, td:nth-child(2) { text-align: left; }
+    th { color: #4d5d75; cursor: pointer; user-select: none; }
+    tbody tr:hover { background: #f8fbff; }
+    .phase-pill { display: inline-block; padding: 3px 7px; border-radius: 999px; font-weight: 700; }
+    .phase-history { color: #1d4ed8; background: #dbeafe; }
+    .phase-forecast { color: #c2410c; background: #ffedd5; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 3px 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    @media (max-width: 1050px) {
+      .filter-panel { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .hero { flex-direction: column; }
+      .model-badge { text-align: left; }
+    }
+
+    @media (max-width: 650px) {
+      .dashboard { width: min(100% - 16px, 1540px); margin-top: 8px; }
+      .hero, .panel { padding: 16px; border-radius: 11px; }
+      .filter-panel, .kpi-grid { grid-template-columns: 1fr; }
+      .button-stack { width: 100%; }
+      .button-stack .btn { flex: 1; }
+      .panel-head, .selection-line, footer { flex-direction: column; }
+      .chart-wrap { height: 390px; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .dashboard { width: 100%; margin: 0; }
+      .filter-panel, .table-actions { display: none; }
+      .panel, .kpi, .hero { box-shadow: none; break-inside: avoid; }
+      .table-wrap { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="dashboard">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Hierarchical demand planning</p>
+        <h1>Retail demand: actual, fitted estimate & forecast</h1>
+        <p class="subtitle">Explore daily carton demand across the Country × Region × Chain × Parent SKU hierarchy. Historical fitted values and future forecasts use the selected Hybrid Fourier Ensemble.</p>
+      </div>
+      <div class="model-badge">Selected model<strong id="model-name"></strong><span id="forecast-range"></span></div>
+    </header>
+
+    <section class="panel" aria-label="Dashboard filters">
+      <div class="filter-panel">
+        <div class="filter-group"><label for="country-filter">Country</label><select id="country-filter"></select></div>
+        <div class="filter-group"><label for="region-filter">Region</label><select id="region-filter"></select></div>
+        <div class="filter-group"><label for="chain-filter">Chain</label><select id="chain-filter"></select></div>
+        <div class="filter-group"><label for="sku-filter">Parent SKU</label><select id="sku-filter"></select></div>
+        <div class="filter-group">
+          <label for="window-filter">History window</label>
+          <select id="window-filter">
+            <option value="90">Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="365" selected>Last 12 months</option>
+            <option value="all">All history</option>
+          </select>
+        </div>
+        <div class="button-stack">
+          <button type="button" class="btn btn-secondary" id="reset-button">Reset</button>
+          <button type="button" class="btn btn-primary" id="download-button">Download CSV</button>
+        </div>
+      </div>
+      <div class="selection-line"><span id="selection-path"></span><span><strong id="series-count"></strong> bottom series selected</span></div>
+    </section>
+
+    <section class="kpi-grid" aria-label="Key performance indicators">
+      <article class="kpi"><div class="kpi-label">Training actual</div><div class="kpi-value" id="actual-total">—</div><div class="kpi-detail" id="actual-detail"></div></article>
+      <article class="kpi"><div class="kpi-label">In-sample fitted WAPE</div><div class="kpi-value" id="fit-wape">—</div><div class="kpi-detail">Diagnostic fit only; not holdout accuracy</div></article>
+      <article class="kpi"><div class="kpi-label">28-day forecast</div><div class="kpi-value" id="forecast-total">—</div><div class="kpi-detail" id="forecast-detail"></div></article>
+      <article class="kpi"><div class="kpi-label">Forecast vs recent 28 days</div><div class="kpi-value" id="forecast-change">—</div><div class="kpi-detail" id="change-detail"></div></article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Daily demand time series</h2><p>Cartons aggregated across the current hierarchy selection. Hover for daily values.</p></div>
+        <div class="phase-key"><span class="phase-swatch"></span>Shaded area = out-of-sample forecast</div>
+      </div>
+      <div class="chart-wrap"><canvas id="demand-chart" aria-label="Actual, fitted estimate, and forecast time series"></canvas></div>
+      <div class="note">In-sample estimates are fitted diagnostic values from a model trained on the complete history. Use the separately reported rolling-validation and untouched-holdout results for an unbiased accuracy assessment. Forecast bounds are approximate 80% empirical intervals and become conservative when multiple bottom series are aggregated.</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Daily detail</h2><p>Most recent displayed dates first. Click a column heading to sort.</p></div>
+        <div class="table-actions"><span id="table-count" class="kpi-detail"></span></div>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th data-key="date">Date</th><th data-key="phase">Phase</th><th data-key="actual">Actual</th><th data-key="estimate">Fitted estimate</th><th data-key="error">Absolute error</th><th data-key="forecast">Forecast</th><th data-key="lower">Lower 80%</th><th data-key="upper">Upper 80%</th>
+      </tr></thead><tbody id="detail-body"></tbody></table></div>
+    </section>
+
+    <footer><span id="data-as-of"></span><span>Offline artifact · no network requests · values in cartons</span></footer>
+  </main>
+
+  <script>__CHART_JS__</script>
+  <script>
+    "use strict";
+    const SERIES = __SERIES_JSON__;
+    const META = __META_JSON__;
+
+    const ids = {
+      country: document.getElementById("country-filter"),
+      region: document.getElementById("region-filter"),
+      chain: document.getElementById("chain-filter"),
+      sku: document.getElementById("sku-filter")
+    };
+    const state = { country: "all", region: "all", chain: "all", sku: "all", window: "365", sortKey: "date", sortDir: "desc" };
+    const fieldMap = { country: "country", region: "region", chain: "chain", sku: "sku" };
+    const allLabels = { country: "All countries", region: "All regions", chain: "All chains", sku: "All Parent SKUs" };
+    let currentRows = [];
+
+    const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+    const fmt1 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const formatNumber = value => value === null || !Number.isFinite(value) ? "—" : fmt.format(value);
+    const sum = values => values.reduce((acc, value) => acc + (Number.isFinite(value) ? value : 0), 0);
+
+    function setOptions(select, values, allLabel, selected) {
+      select.replaceChildren();
+      const all = document.createElement("option");
+      all.value = "all";
+      all.textContent = allLabel;
+      select.appendChild(all);
+      values.forEach(value => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      });
+      select.value = values.includes(selected) ? selected : "all";
+    }
+
+    function matchesThrough(series, field) {
+      const order = ["country", "region", "chain", "sku"];
+      const stop = order.indexOf(field);
+      for (let i = 0; i < stop; i += 1) {
+        const key = order[i];
+        if (state[key] !== "all" && series[fieldMap[key]] !== state[key]) return false;
+      }
+      return true;
+    }
+
+    function refreshCascades() {
+      ["country", "region", "chain", "sku"].forEach(field => {
+        const values = [...new Set(SERIES.filter(series => matchesThrough(series, field)).map(series => series[fieldMap[field]]))].sort();
+        setOptions(ids[field], values, allLabels[field], state[field]);
+        state[field] = ids[field].value;
+      });
+    }
+
+    function selectedSeries() {
+      return SERIES.filter(series =>
+        (state.country === "all" || series.country === state.country) &&
+        (state.region === "all" || series.region === state.region) &&
+        (state.chain === "all" || series.chain === state.chain) &&
+        (state.sku === "all" || series.sku === state.sku)
+      );
+    }
+
+    function aggregateSelection(selection) {
+      const historyLength = META.historyDates.length;
+      const futureLength = META.futureDates.length;
+      const actual = Array(historyLength).fill(0);
+      const estimate = Array(historyLength).fill(0);
+      const estimateCount = Array(historyLength).fill(0);
+      const forecast = Array(futureLength).fill(0);
+      const lower = Array(futureLength).fill(0);
+      const upper = Array(futureLength).fill(0);
+
+      selection.forEach(series => {
+        for (let i = 0; i < historyLength; i += 1) {
+          actual[i] += series.actual[i];
+          if (series.estimate[i] !== null) {
+            estimate[i] += series.estimate[i];
+            estimateCount[i] += 1;
+          }
+        }
+        for (let i = 0; i < futureLength; i += 1) {
+          forecast[i] += series.forecast[i];
+          lower[i] += series.lower[i];
+          upper[i] += series.upper[i];
+        }
+      });
+      return { actual, estimate: estimate.map((v, i) => estimateCount[i] === selection.length ? v : null), forecast, lower, upper };
+    }
+
+    const forecastShade = {
+      id: "forecastShade",
+      beforeDraw(chart, args, options) {
+        const index = chart.data.labels.indexOf(options.startDate);
+        if (index < 0) return;
+        const { ctx, chartArea, scales } = chart;
+        const x = scales.x.getPixelForValue(index);
+        ctx.save();
+        ctx.fillStyle = "rgba(249, 115, 22, 0.055)";
+        ctx.fillRect(x, chartArea.top, chartArea.right - x, chartArea.bottom - chartArea.top);
+        ctx.strokeStyle = "rgba(249, 115, 22, 0.55)";
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    Chart.register(forecastShade);
+
+    const demandChart = new Chart(document.getElementById("demand-chart"), {
+      type: "line",
+      data: { labels: [], datasets: [
+        { label: "80% lower", data: [], borderWidth: 0, pointRadius: 0, fill: false, hiddenFromLegend: true },
+        { label: "80% forecast interval", data: [], borderWidth: 0, pointRadius: 0, fill: "-1", backgroundColor: "rgba(249,115,22,.14)" },
+        { label: "Actual", data: [], borderColor: "#172033", backgroundColor: "#172033", borderWidth: 1.8, pointRadius: 0, pointHoverRadius: 4, tension: .12 },
+        { label: "In-sample estimate", data: [], borderColor: "#2563eb", backgroundColor: "#2563eb", borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .12 },
+        { label: "Out-of-sample forecast", data: [], borderColor: "#f97316", backgroundColor: "#f97316", borderWidth: 2.5, pointRadius: 1.5, pointHoverRadius: 5, tension: .12 }
+      ]},
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 180 },
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          forecastShade: { startDate: META.futureDates[0] },
+          legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8, filter: item => item.text !== "80% lower" } },
+          tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatNumber(context.parsed.y)} cartons` } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxTicksLimit: 14, maxRotation: 0 } },
+          y: { beginAtZero: true, title: { display: true, text: "Cartons" }, ticks: { callback: value => fmt.format(value) } }
+        }
+      }
+    });
+
+    function displayStartIndex() {
+      if (state.window === "all") return 0;
+      return Math.max(0, META.historyDates.length - Number(state.window));
+    }
+
+    function buildRows(data, start) {
+      const rows = [];
+      for (let i = start; i < META.historyDates.length; i += 1) {
+        const estimate = data.estimate[i];
+        rows.push({ date: META.historyDates[i], phase: "In sample", actual: data.actual[i], estimate, error: estimate === null ? null : Math.abs(data.actual[i] - estimate), forecast: null, lower: null, upper: null });
+      }
+      for (let i = 0; i < META.futureDates.length; i += 1) {
+        rows.push({ date: META.futureDates[i], phase: "Forecast", actual: null, estimate: null, error: null, forecast: data.forecast[i], lower: data.lower[i], upper: data.upper[i] });
+      }
+      return rows;
+    }
+
+    function renderKPIs(data, selection) {
+      const fittedActual = [];
+      const fittedEstimate = [];
+      data.estimate.forEach((value, index) => {
+        if (value !== null) { fittedActual.push(data.actual[index]); fittedEstimate.push(value); }
+      });
+      const wapeDenominator = sum(fittedActual);
+      const wape = wapeDenominator ? fittedActual.reduce((acc, value, i) => acc + Math.abs(value - fittedEstimate[i]), 0) / wapeDenominator : null;
+      const forecastTotal = sum(data.forecast);
+      const recentActual = sum(data.actual.slice(-META.horizon));
+      const change = recentActual ? forecastTotal / recentActual - 1 : null;
+
+      document.getElementById("actual-total").textContent = formatNumber(sum(data.actual));
+      document.getElementById("actual-detail").textContent = `${META.historyDates[0]} to ${META.historyDates.at(-1)} · ${selection.length} series`;
+      document.getElementById("fit-wape").textContent = wape === null ? "—" : `${(wape * 100).toFixed(1)}%`;
+      document.getElementById("forecast-total").textContent = formatNumber(forecastTotal);
+      document.getElementById("forecast-detail").textContent = `${META.futureDates[0]} to ${META.futureDates.at(-1)}`;
+      const changeEl = document.getElementById("forecast-change");
+      changeEl.textContent = change === null ? "—" : `${change >= 0 ? "+" : ""}${(change * 100).toFixed(1)}%`;
+      changeEl.className = `kpi-value ${change === null ? "" : change >= 0 ? "positive" : "negative"}`;
+      document.getElementById("change-detail").textContent = `Forecast ${formatNumber(forecastTotal)} vs recent ${formatNumber(recentActual)}`;
+    }
+
+    function renderChart(data, start) {
+      const historyDates = META.historyDates.slice(start);
+      const historyNulls = Array(historyDates.length).fill(null);
+      const futureNulls = Array(META.futureDates.length).fill(null);
+      demandChart.data.labels = historyDates.concat(META.futureDates);
+      demandChart.data.datasets[0].data = historyNulls.concat(data.lower);
+      demandChart.data.datasets[1].data = historyNulls.concat(data.upper);
+      demandChart.data.datasets[2].data = data.actual.slice(start).concat(futureNulls);
+      demandChart.data.datasets[3].data = data.estimate.slice(start).concat(futureNulls);
+      demandChart.data.datasets[4].data = historyNulls.concat(data.forecast);
+      demandChart.update("none");
+    }
+
+    function cell(text, className = "") {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (className) td.className = className;
+      return td;
+    }
+
+    function renderTable() {
+      const body = document.getElementById("detail-body");
+      body.replaceChildren();
+      const sorted = [...currentRows].sort((a, b) => {
+        const av = a[state.sortKey], bv = b[state.sortKey];
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;
+        if (bv === null) return -1;
+        const comparison = av < bv ? -1 : av > bv ? 1 : 0;
+        return state.sortDir === "asc" ? comparison : -comparison;
+      });
+      sorted.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.appendChild(cell(row.date));
+        const phase = document.createElement("td");
+        const pill = document.createElement("span");
+        pill.className = `phase-pill ${row.phase === "Forecast" ? "phase-forecast" : "phase-history"}`;
+        pill.textContent = row.phase;
+        phase.appendChild(pill);
+        tr.appendChild(phase);
+        ["actual", "estimate", "error", "forecast", "lower", "upper"].forEach(key => tr.appendChild(cell(formatNumber(row[key]))));
+        body.appendChild(tr);
+      });
+      document.getElementById("table-count").textContent = `${sorted.length} daily rows`;
+      document.querySelectorAll("th[data-key]").forEach(th => {
+        const base = th.dataset.label || th.textContent.replace(/ [▲▼]$/, "");
+        th.dataset.label = base;
+        th.textContent = `${base}${state.sortKey === th.dataset.key ? state.sortDir === "asc" ? " ▲" : " ▼" : ""}`;
+      });
+    }
+
+    function updateSelectionText(selection) {
+      const labels = [state.country, state.region, state.chain, state.sku].map((value, i) => value === "all" ? ["All countries", "All regions", "All chains", "All SKUs"][i] : value);
+      document.getElementById("selection-path").textContent = labels.join("  ›  ");
+      document.getElementById("series-count").textContent = selection.length;
+    }
+
+    function updateDashboard() {
+      const selection = selectedSeries();
+      const data = aggregateSelection(selection);
+      const start = displayStartIndex();
+      currentRows = buildRows(data, start);
+      updateSelectionText(selection);
+      renderKPIs(data, selection);
+      renderChart(data, start);
+      renderTable();
+    }
+
+    function escapeCsv(value) {
+      if (value === null || value === undefined) return "";
+      const text = String(value);
+      return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    }
+
+    function downloadCsv() {
+      const columns = ["date", "phase", "actual", "estimate", "error", "forecast", "lower", "upper"];
+      const csv = [columns.join(",")].concat(currentRows.map(row => columns.map(column => escapeCsv(row[column])).join(","))).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "retail_demand_filtered.csv";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    ["country", "region", "chain", "sku"].forEach((field, fieldIndex) => {
+      ids[field].addEventListener("change", event => {
+        state[field] = event.target.value;
+        ["country", "region", "chain", "sku"].slice(fieldIndex + 1).forEach(child => { state[child] = "all"; });
+        refreshCascades();
+        updateDashboard();
+      });
+    });
+    document.getElementById("window-filter").addEventListener("change", event => { state.window = event.target.value; updateDashboard(); });
+    document.getElementById("reset-button").addEventListener("click", () => {
+      Object.assign(state, { country: "all", region: "all", chain: "all", sku: "all", window: "365" });
+      document.getElementById("window-filter").value = "365";
+      refreshCascades();
+      updateDashboard();
+    });
+    document.getElementById("download-button").addEventListener("click", downloadCsv);
+    document.querySelectorAll("th[data-key]").forEach(th => th.addEventListener("click", () => {
+      const key = th.dataset.key;
+      if (state.sortKey === key) state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+      else { state.sortKey = key; state.sortDir = "desc"; }
+      renderTable();
+    }));
+
+    document.getElementById("model-name").textContent = META.model;
+    document.getElementById("forecast-range").textContent = `${META.futureDates[0]} — ${META.futureDates.at(-1)}`;
+    document.getElementById("data-as-of").textContent = `Data through ${META.historyDates.at(-1)} · fitted values begin ${META.estimateStart}`;
+    refreshCascades();
+    updateDashboard();
+  </script>
+</body>
+</html>

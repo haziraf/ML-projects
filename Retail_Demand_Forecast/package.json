@@ -1,0 +1,9 @@
+{
+  "name": "retail-demand-forecast-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build-time dependency for the offline retail demand dashboard",
+  "dependencies": {
+    "chart.js": "4.5.1"
+  }
+}

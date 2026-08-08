@@ -1,0 +1,42 @@
+{
+  "rows": 83950,
+  "date_start": "2024-08-08",
+  "date_end": "2026-08-07",
+  "daily_dates": 730,
+  "hierarchy_counts": {
+    "Country": 3,
+    "Country_Region": 9,
+    "Country_Region_Chain": 23,
+    "Bottom": 115
+  },
+  "missing_values": 0,
+  "duplicate_bottom_dates": 0,
+  "target_mean": 95.82877903513996,
+  "target_median": 79.0,
+  "target_min": 0.0,
+  "target_max": 654.0,
+  "zero_rate": 0.029493746277546157,
+  "first_to_last_90_day_mean_change": 0.14933266095517106,
+  "weekday_mean": {
+    "Monday": 114.68494983277591,
+    "Tuesday": 108.22299331103679,
+    "Wednesday": 99.03478260869565,
+    "Thursday": 91.66144927536232,
+    "Friday": 104.49325051759834,
+    "Saturday": 84.43637123745819,
+    "Sunday": 68.22441471571906
+  },
+  "weekday_max_min_ratio": 1.6809957302037835,
+  "panel_lag_correlations": {
+    "1": 0.7829445984193724,
+    "7": 0.7703266864333785,
+    "14": 0.7671258541034425,
+    "28": 0.7719320728748517,
+    "364": 0.775591277088226,
+    "365": 0.7176933256773765
+  },
+  "weekly_stl_seasonal_strength_total": 0.39630067248399226,
+  "weekly_stl_trend_strength_total": 0.2766885887585605,
+  "weekly_stl_seasonal_strength_bottom_median": 0.26664073814151457,
+  "weekly_stl_trend_strength_bottom_median": 0.24204166772905955
+}

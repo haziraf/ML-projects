@@ -85,7 +85,7 @@ Before production, add event/price/stockout fields with explicit future availabi
 
 ## Interactive dashboard
 
-[Open the Retail Demand Forecast Dashboard](retail_demand_dashboard.html)
+[Open the Retail Demand Forecast Dashboard](https://small-waterfall-e74f.hazirahrafidi.workers.dev)
 
 The dashboard provides cascading Country, Region, Chain, and Parent SKU filters. It opens with a monthly time-series view and supports click-through drill-down to daily historical actuals, in-sample fitted estimates, and the 28-day out-of-sample forecast with approximate 80% intervals.
 
